@@ -11,6 +11,7 @@
 #include "mars/proto/stn_callback.h"
 #include "mars/proto/src/Proto/conversation.h"
 #include "mars/comm/thread/atomic_oper.h"
+#include "mars/comm/xlogger/xlogger.h"
 #include "mars/app/app.h"
 #include <map>
 #include <time.h>
@@ -794,7 +795,7 @@ namespace mars {
                 conv.isSilent = db->getIntValue(statementHandle, 5);
                 conv.timestamp = db->getBigIntValue(statementHandle, 6);
                 
-              std::list<TMessage> lastMessages = GetMessages(conv.conversationType, conv.target, conv.line, std::list<int>(), true, 1, 0, "");
+              std::list<TMessage> lastMessages = GetMessages(conv.conversationType, conv.target, conv.line, std::list<int>(), true, 1, INT_MAX, "");
                 if (lastMessages.size() > 0) {
                     conv.lastMessage = *lastMessages.begin();
                 }
@@ -1053,16 +1054,25 @@ namespace mars {
             }
             int64_t ts = 0;
             
-            if (old) {
-                where += " and _timestamp < ?";
-            } else {
-                where += " and _timestamp > ?";
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
+                if (old) {
+                    where += " and _timestamp < ?";
+                } else {
+                    where += " and _timestamp > ?";
+                }
             }
-            if (startPoint == 0) {
-                ts = LONG_MAX;
-            } else {
+            
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
                 TMessage startMsg = GetMessageById(startPoint);
-                ts = startMsg.timestamp;
+                if (startMsg.messageId > 0) {
+                    ts = startMsg.timestamp;
+                } else {
+                    if (old) {
+                        ts = 9223372036854775807LL;
+                    } else {
+                        ts = 0;
+                    }
+                }
             }
             
             if (contentTypes.size() > 0) {
@@ -1149,7 +1159,10 @@ namespace mars {
                 db->Bind(statementHandle, withUser, index++);
                 db->Bind(statementHandle, withUser, index++);
             }
-            db->Bind(statementHandle, ts, index++);
+            
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
+                db->Bind(statementHandle, ts, index++);
+            }
             
             std::list<TMessage> result;
             
@@ -1238,16 +1251,24 @@ namespace mars {
             
             int64_t ts = 0;
             
-            if (desc) {
-                where += " and _timestamp < ?";
-            } else {
-                where += " and _timestamp > ?";
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
+                if (desc) {
+                    where += " and _timestamp < ?";
+                } else {
+                    where += " and _timestamp > ?";
+                }
             }
-            if (startPoint == 0) {
-                ts = LONG_MAX;
-            } else {
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
                 TMessage startMsg = GetMessageById(startPoint);
-                ts = startMsg.timestamp;
+                if (startMsg.messageId > 0) {
+                    ts = startMsg.timestamp;
+                } else {
+                    if (desc) {
+                        ts = 9223372036854775807LL;
+                    } else {
+                        ts = 0;
+                    }
+                }
             }
             
             if (contentTypes.size() > 0) {
@@ -1330,7 +1351,9 @@ namespace mars {
             if (!withUser.empty()) {
                 db->Bind(statementHandle, withUser, index++);
             }
-            db->Bind(statementHandle, ts, index++);
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
+                db->Bind(statementHandle, ts, index++);
+            }
             
             std::list<TMessage> result;
             
@@ -1395,12 +1418,12 @@ namespace mars {
                     where += ",";
                 }
                 where = where.substr(0, where.size()-1);
-                where += ") and";
+                where += ") ";
             }
             
             
             if (lines.size() > 0) {
-                where += " _conv_line in (";
+                where += " and _conv_line in (";
                 for (std::list<int>::const_iterator it = lines.begin(); it != lines.end(); it++) {
                     char str[255];
                     memset(str, 0, 255);
@@ -1409,28 +1432,40 @@ namespace mars {
                     where += ",";
                 }
                 where = where.substr(0, where.size()-1);
-                where += ") and";
+                where += ") ";
             }
             
-            where += " _status=? and";
+            if (messageStatus >= 0) {
+                where += " and _status=? ";
+            }
+            
             
             
             if (!withUser.empty()) {
-                where += " _from=? and";
+                where += " and _from=? ";
             }
             
             int64_t ts = 0;
             
-            if (desc) {
-                where += " and _timestamp < ?";
-            } else {
-                where += " and _timestamp > ?";
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
+                if (desc) {
+                    where += " and _timestamp < ?";
+                } else {
+                    where += " and _timestamp > ?";
+                }
             }
-            if (startPoint == 0) {
-                ts = LONG_MAX;
-            } else {
+            
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
                 TMessage startMsg = GetMessageById(startPoint);
-                ts = startMsg.timestamp;
+                if (startMsg.messageId > 0) {
+                    ts = startMsg.timestamp;
+                } else {
+                    if (desc) {
+                        ts = 9223372036854775807LL;
+                    } else {
+                        ts = 0;
+                    }
+                }
             }
             
             std::string orderBy;
@@ -1493,11 +1528,16 @@ namespace mars {
             }
             
             int index = 1;
-            db->Bind(statementHandle, messageStatus, index++);
+            if (messageStatus >= 0) {
+                db->Bind(statementHandle, messageStatus, index++);
+            }
+            
             if (!withUser.empty()) {
                 db->Bind(statementHandle, withUser, index++);
             }
-            db->Bind(statementHandle, ts, index++);
+            if (startPoint != 0 && startPoint != INT_MAX && startPoint != LONG_MAX && startPoint != 9223372036854775807LL) {
+                db->Bind(statementHandle, ts, index++);
+            }
             
             std::list<TMessage> result;
             
@@ -1914,6 +1954,63 @@ namespace mars {
             return false;
         }
         
+        bool MessageDB::ClearUnreadStatus(const std::list<int> &conversationTypes, const std::list<int> lines) {
+            DB2 *db = DB2::Instance();
+            if (!db->isOpened()) {
+                return false;
+            }
+            std::string where;
+            if (conversationTypes.size() > 0) {
+                where += "_conv_type in (";
+                for (std::list<int>::const_iterator it = conversationTypes.begin(); it != conversationTypes.end(); it++) {
+                    char str[255];
+                    memset(str, 0, 255);
+                    sprintf(str, "%d", *it);
+                    where += str;
+                    where += ",";
+                }
+                where = where.substr(0, where.size()-1);
+                where += ") and ";
+            }
+            
+            
+            if (lines.size() > 0) {
+                where += "_conv_line in (";
+                for (std::list<int>::const_iterator it = lines.begin(); it != lines.end(); it++) {
+                    char str[255];
+                    memset(str, 0, 255);
+                    sprintf(str, "%d", *it);
+                    where += str;
+                    where += ",";
+                }
+                where = where.substr(0, where.size()-1);
+                where += ") and ";
+            }
+            
+            where += " _status in (?, ?, ?)";
+            
+#ifdef __ANDROID__
+            std::list<std::string> columns;
+            columns.push_back("_status");
+            std::string sql = db->GetUpdateSql(MESSAGE_TABLE_NAME, columns, where);
+#else
+            std::string sql = db->GetUpdateSql(MESSAGE_TABLE_NAME, {"_status"}, where);
+#endif
+            int error = 0;
+            RecyclableStatement updateStatementHandle(db, sql, error);
+            if (error != 0) {
+                return false;
+            }
+            
+            db->Bind(updateStatementHandle, Message_Status_Readed, 1);
+            db->Bind(updateStatementHandle, Message_Status_Unread, 2);
+            db->Bind(updateStatementHandle, Message_Status_Mentioned, 3);
+            db->Bind(updateStatementHandle, Message_Status_AllMentioned, 4);
+            int count = db->ExecuteUpdate(updateStatementHandle);
+            
+            return count > 0;
+        }
+        
         int64_t MessageDB::getConversationReadMaxDt(int conversationType, const std::string &target, int line) {
             DB2 *db = DB2::Instance();
             if (!db->isOpened()) {
@@ -2309,9 +2406,13 @@ namespace mars {
             columns.push_back("_extra");
             columns.push_back("_member_count");
             columns.push_back("_update_dt");
+            columns.push_back("_mute");
+            columns.push_back("_join_type");
+            columns.push_back("_private_chat");
+            columns.push_back("_searchable");
             std::string sql = db->GetSelectSql(GROUP_TABLE_NAME, columns, "_name like ?", "", limit);
 #else
-            std::string sql = db->GetSelectSql(GROUP_TABLE_NAME, {"_uid", "_name",  "_portrait", "_owner", "_type", "_extra", "_member_count", "_update_dt"}, "_name like ?", "", limit);
+            std::string sql = db->GetSelectSql(GROUP_TABLE_NAME, {"_uid", "_name",  "_portrait", "_owner", "_type", "_extra", "_member_count", "_update_dt", "_mute", "_join_type", "_private_chat", "_searchable"}, "_name like ?", "", limit);
 #endif
             
             int error = 0;
@@ -2334,6 +2435,10 @@ namespace mars {
                 result.groupInfo.extra = db->getStringValue(statementHandle, 5);
                 result.groupInfo.memberCount = db->getIntValue(statementHandle, 6);
                 result.groupInfo.updateDt = db->getBigIntValue(statementHandle, 7);
+                result.groupInfo.mute = db->getBigIntValue(statementHandle, 8);
+                result.groupInfo.joinType = db->getBigIntValue(statementHandle, 9);
+                result.groupInfo.privateChat = db->getBigIntValue(statementHandle, 10);
+                result.groupInfo.searchable = db->getBigIntValue(statementHandle, 11);
                 result.marchedType = 0;
                 results.push_back(result);
             }
@@ -2433,6 +2538,7 @@ namespace mars {
             if (!db->isOpened()) {
                 return gi;
             }
+            
 #ifdef __ANDROID__
             std::list<std::string> columns;
             columns.push_back("_name");
@@ -2442,9 +2548,13 @@ namespace mars {
             columns.push_back("_extra");
             columns.push_back("_member_count");
             columns.push_back("_update_dt");
+            columns.push_back("_mute");
+            columns.push_back("_join_type");
+            columns.push_back("_private_chat");
+            columns.push_back("_searchable");
             std::string sql = db->GetSelectSql(GROUP_TABLE_NAME, columns, "_uid=?");
 #else
-            std::string sql = db->GetSelectSql(GROUP_TABLE_NAME, {"_name",  "_portrait", "_owner", "_type", "_extra", "_member_count", "_update_dt"}, "_uid=?");
+            std::string sql = db->GetSelectSql(GROUP_TABLE_NAME, {"_name",  "_portrait", "_owner", "_type", "_extra", "_member_count", "_update_dt", "_mute", "_join_type", "_private_chat", "_searchable"}, "_uid=?");
 #endif
             
             int error = 0;
@@ -2464,7 +2574,10 @@ namespace mars {
                 gi.extra = db->getStringValue(statementHandle, 4);
                 gi.memberCount = db->getIntValue(statementHandle, 5);
                 gi.updateDt = db->getBigIntValue(statementHandle, 6);
-                
+                gi.mute = db->getIntValue(statementHandle, 7);
+                gi.joinType = db->getIntValue(statementHandle, 8);
+                gi.privateChat = db->getIntValue(statementHandle, 9);
+                gi.searchable = db->getIntValue(statementHandle, 10);
             } else {
                 gi.target = "";//empty
                 gi.updateDt = 0;
@@ -2494,9 +2607,13 @@ namespace mars {
             columns.push_back("_extra");
             columns.push_back("_member_count");
             columns.push_back("_update_dt");
+            columns.push_back("_mute");
+            columns.push_back("_join_type");
+            columns.push_back("_private_chat");
+            columns.push_back("_searchable");
             std::string sql = db->GetInsertSql(GROUP_TABLE_NAME, columns, true);
 #else
-            std::string sql = db->GetInsertSql(GROUP_TABLE_NAME, {"_uid", "_name", "_portrait", "_owner", "_type", "_extra", "_member_count", "_update_dt"}, true);
+            std::string sql = db->GetInsertSql(GROUP_TABLE_NAME, {"_uid", "_name", "_portrait", "_owner", "_type", "_extra", "_member_count", "_update_dt", "_mute", "_join_type", "_private_chat", "_searchable"}, true);
 #endif
             
             int error = 0;
@@ -2514,6 +2631,10 @@ namespace mars {
             db->Bind(statementHandle, groupInfo.extra, 6);
             db->Bind(statementHandle, groupInfo.memberCount, 7);
             db->Bind(statementHandle, groupInfo.updateDt, 8);
+            db->Bind(statementHandle, groupInfo.mute, 9);
+            db->Bind(statementHandle, groupInfo.joinType, 10);
+            db->Bind(statementHandle, groupInfo.privateChat, 11);
+            db->Bind(statementHandle, groupInfo.searchable, 12);
             long ret = 0;
             ret = db->ExecuteInsert(statementHandle, &ret);
             return ret;
@@ -2774,6 +2895,7 @@ namespace mars {
                 std::list<std::pair<std::string, int64_t>> reqList;
                 reqList.push_back(std::pair<std::string, int64_t>(userId, ui.updateDt));
                 reloadUserInfoFromRemote(reqList);
+                xerror2("get user info refresh %s, %d,ver:%d",userId.c_str(), refresh, ui.uid.empty());
             }
             return ui;
         }
@@ -3274,6 +3396,30 @@ namespace mars {
             long ret = 0;
             ret = db->ExecuteInsert(statementHandle, &ret);
             return ret;
+        }
+        
+        bool MessageDB::DeleteFriend(const std::string &friendUid) {
+            if (friendUid.empty()) {
+                return false;
+            }
+            
+            DB2 *db = DB2::Instance();
+            if (!db->isOpened()) {
+                return false;
+            }
+            
+            std::string sql = db->GetDeleteSql(FRIEND_TABLE_NAME, "_friend_uid=?");
+            
+            int error = 0;
+            RecyclableStatement statementHandle(db, sql, error);
+            
+            statementHandle.bind(1, friendUid);
+            
+            if (db->ExecuteDelete(statementHandle) > 0) {
+                return true;
+            }
+            
+            return false;
         }
         
         std::list<TFriendRequest> MessageDB::getFriendRequest(int direction) {

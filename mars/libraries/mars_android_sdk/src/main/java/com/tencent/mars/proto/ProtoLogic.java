@@ -413,7 +413,7 @@ public class ProtoLogic {
 //            success:(void(^)(NSString *groupId))successBlock
 //              error:(void(^)(int error_code))errorBlock;
 
-    public static native void createGroup(String groupId, String groupName, String groupPortrait, String[] memberIds, int[] notifyLines, ProtoMessageContent notifyMsg, IGeneralCallback2 callback);
+    public static native void createGroup(String groupId, String groupName, String groupPortrait, int groupType, String[] memberIds, int[] notifyLines, ProtoMessageContent notifyMsg, IGeneralCallback2 callback);
 //- (void)addMembers:(NSArray *)members
 //           toGroup:(NSString *)groupId
 //       notifyLines:(NSArray<NSNumber *> *)notifyLines
@@ -458,6 +458,15 @@ public class ProtoLogic {
 //    success:(void(^)())successBlock
 //    error:(void(^)(int error_code))errorBlock;
     public static native void modifyGroupAlias(String groupId, String newAlias, int[] notifyLines, ProtoMessageContent notifyMsg, IGeneralCallback callback);
+
+//- (void)setGroupManager:(NSString *)groupId
+//                  isSet:(BOOL)isSet
+//              memberIds:(NSArray<NSString *> *)memberIds
+//            notifyLines:(NSArray<NSNumber *> *)notifyLines
+//          notifyContent:(WFCCMessageContent *)notifyContent
+//                success:(void(^)(void))successBlock
+//                  error:(void(^)(int error_code))errorBlock {
+    public static native void setGroupManager(String groupId, boolean isSet, String[] memberIds, int[] notifyLines, ProtoMessageContent notifyMsg, IGeneralCallback callback);
 
 //- (NSArray<WFCCGroupMember *> *)getGroupMembers:(NSString *)groupId
 //                             forceUpdate:(BOOL)forceUpdate;

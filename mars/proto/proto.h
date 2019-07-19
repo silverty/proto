@@ -34,6 +34,16 @@
 #define MESSAGE_CONTENT_TYPE_MODIFY_GROUP_ALIAS 111
 #define MESSAGE_CONTENT_TYPE_CHANGE_GROUP_PORTRAIT 112
 
+#define MESSAGE_CONTENT_TYPE_CHANGE_MUTE 113
+#define MESSAGE_CONTENT_TYPE_CHANGE_JOINTYPE 114
+#define MESSAGE_CONTENT_TYPE_CHANGE_PRIVATECHAT 115
+#define MESSAGE_CONTENT_TYPE_CHANGE_SEARCHABLE 116
+#define MESSAGE_CONTENT_TYPE_SET_MANAGER 117
+
+
+
+
+
 #if WFCHAT_PROTO_SERIALIZABLE
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/writer.h"
@@ -125,7 +135,7 @@ namespace mars{
         
         class TGroupInfo : public TSerializable {
         public:
-            TGroupInfo() : target(""), type(0), memberCount(0), updateDt(0) {}
+            TGroupInfo() : target(""), type(0), memberCount(0), updateDt(0), mute(0), joinType(0), privateChat(0), searchable(0) {}
             std::string target;
             std::string name;
             std::string portrait;
@@ -134,6 +144,10 @@ namespace mars{
             int memberCount;
             std::string extra;
             int64_t updateDt;
+            int mute;
+            int joinType;
+            int privateChat;
+            int searchable;
             virtual ~TGroupInfo() {}
 #if WFCHAT_PROTO_SERIALIZABLE
             virtual void Serialize(void *writer) const;
@@ -632,7 +646,7 @@ namespace mars{
         
         extern void blackListRequest(const std::string &userId, bool blacked, GeneralOperationCallback *callback);
         
-        extern void (*createGroup)(const std::string &groupId, const std::string &groupName, const std::string &groupPortrait, const std::list<std::string> &groupMembers, const std::list<int> &notifyLines, TMessageContent &content, CreateGroupCallback *callback);
+        extern void (*createGroup)(const std::string &groupId, const std::string &groupName, const std::string &groupPortrait, int groupType, const std::list<std::string> &groupMembers, const std::list<int> &notifyLines, TMessageContent &content, CreateGroupCallback *callback);
         
         extern void (*addMembers)(const std::string &groupId, const std::list<std::string> &members, const std::list<int> &notifyLines, TMessageContent &content, GeneralOperationCallback *callback);
         
@@ -651,6 +665,8 @@ namespace mars{
         extern void (*getGroupMembers)(const std::string &groupId, int64_t updateDt);
         
         extern void (*transferGroup)(const std::string &groupId, const std::string &newOwner, const std::list<int> &notifyLines, TMessageContent &content, GeneralOperationCallback *callback);
+        
+        extern void SetGroupManager(const std::string &groupId, const std::list<std::string> userIds, int setOrDelete, const std::list<int> &notifyLines, TMessageContent &content, GeneralOperationCallback *callback);
         
         extern void (*getUserInfo)(const std::list<std::pair<std::string, int64_t>> &userReqList, GetUserInfoCallback *callback);
         

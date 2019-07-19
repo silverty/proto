@@ -31,6 +31,7 @@
 #include "mars/proto/src/Proto/dismiss_group_request.h"
 #include "mars/proto/src/Proto/modify_group_alias.h"
 #include "mars/proto/src/Proto/modify_group_info.h"
+#include "mars/proto/src/Proto/set_group_manager.h"
 #include "mars/proto/src/Proto/id_buf.h"
 #include "mars/proto/src/Proto/int64_buf.h"
 #include "mars/proto/src/Proto/id_list_buf.h"
@@ -109,6 +110,7 @@ const std::string getGroupInfoTopic = "GPGI";
 const std::string getUserInfoTopic = "UPUI";
 const std::string getGroupMemberTopic = "GPGM";
 const std::string transferGroupTopic = "GTG";
+const std::string setGroupManagerTopic = "GSM";
 const std::string getQiniuUploadTokenTopic = "GQNUT";
 const std::string modifyMyInfoTopic = "MMI";
 const std::string AddFriendRequestTopic = "FAR";
@@ -324,6 +326,27 @@ public:
     }
 };
 
+        class DeleteFriendPublishCallback : public MQTTPublishCallback {
+        public:
+            DeleteFriendPublishCallback(GeneralOperationCallback *cb, const std::string &fid) : MQTTPublishCallback(), callback(cb), friendUid(fid) {}
+            GeneralOperationCallback *callback;
+            std::string friendUid;
+            void onSuccess(const unsigned char* data, size_t len) {
+                mars::stn::MessageDB::Instance()->DeleteFriend(friendUid);
+                if(callback)
+                    callback->onSuccess();
+                delete this;
+            };
+            void onFalure(int errorCode) {
+                if(callback)
+                    callback->onFalure(errorCode);
+                delete this;
+            };
+            virtual ~DeleteFriendPublishCallback() {
+                
+            }
+        };
+        
         class RecallMessagePublishCallback : public MQTTPublishCallback {
         public:
             RecallMessagePublishCallback(GeneralOperationCallback *cb, long long messageUid) : MQTTPublishCallback(), callback(cb), uid(messageUid) {}
@@ -1276,7 +1299,7 @@ void handleFriendRequest(const std::string &userId, bool accept, GeneralOperatio
 void deleteFriend(const std::string &userId, GeneralOperationCallback *callback) {
     IDBuf *request = new IDBuf();
     request->id = userId;
-    publishTask(request, new GeneralOperationPublishCallback(callback), DeleteFriendTopic, false);
+    publishTask(request, new DeleteFriendPublishCallback(callback, userId), DeleteFriendTopic, false);
 }
         
         void setFriendAlias(const std::string &userId, const std::string &alias, GeneralOperationCallback *callback) {
@@ -1293,11 +1316,11 @@ void blackListRequest(const std::string &userId, bool blacked, GeneralOperationC
     publishTask(request, new GeneralOperationPublishCallback(callback), BlackListUserTopic, false);
 }
 
-void (*createGroup)(const std::string &groupId, const std::string &groupName, const std::string &groupPortrait, const std::list<std::string> &groupMembers, const std::list<int> &notifyLines, TMessageContent &content, CreateGroupCallback *callback)
-= [](const std::string &groupId, const std::string &groupName, const std::string &groupPortrait, const std::list<std::string> &groupMembers, const std::list<int> &notifyLines, TMessageContent &content, CreateGroupCallback *callback) {
+void (*createGroup)(const std::string &groupId, const std::string &groupName, const std::string &groupPortrait, int groupType, const std::list<std::string> &groupMembers, const std::list<int> &notifyLines, TMessageContent &content, CreateGroupCallback *callback)
+= [](const std::string &groupId, const std::string &groupName, const std::string &groupPortrait, int groupType, const std::list<std::string> &groupMembers, const std::list<int> &notifyLines, TMessageContent &content, CreateGroupCallback *callback) {
     CreateGroupRequest *request = new CreateGroupRequest();
     request->group.groupInfo.targetId = groupId;
-    request->group.groupInfo.type = GroupType_Normal;
+    request->group.groupInfo.type = (GroupType)groupType;
     request->group.groupInfo.portrait = groupPortrait;
     request->group.groupInfo.name = groupName;
 
@@ -1406,6 +1429,10 @@ public:
                 tInfo.extra = info.extra;
                 tInfo.updateDt = info.updateDt;
                 tInfo.memberCount = info.memberCount;
+                tInfo.mute = info.mute;
+                tInfo.joinType = info.joinType;
+                tInfo.privateChat = info.privateChat;
+                tInfo.searchable = info.searchable;
                 retList.push_back(tInfo);
                 MessageDB::Instance()->InsertGroupInfo(tInfo);
             }
@@ -1538,7 +1565,24 @@ void (*transferGroup)(const std::string &groupId, const std::string &newOwner, c
 
     publishTask(request, new GeneralOperationPublishCallback(callback), transferGroupTopic, false);
 };
-
+        
+void SetGroupManager(const std::string &groupId, const std::list<std::string> userIds, int setOrDelete, const std::list<int> &notifyLines, TMessageContent &content, GeneralOperationCallback *callback) {
+    SetGroupManagerRequest *request = new SetGroupManagerRequest();
+    request->groupId = groupId;
+    request->type = setOrDelete;
+    
+    for(std::list<std::string>::const_iterator it = userIds.begin(); it != userIds.end(); it++) {
+        request->userIds.push_back(*it);
+    }
+    
+    for(std::list<int>::const_iterator it = notifyLines.begin(); it != notifyLines.end(); it++) {
+        request->toLines.push_back(*it);
+    }
+    
+    fillMessageContent(content, &(request->notifyContent));
+    publishTask(request, new GeneralOperationPublishCallback(callback), setGroupManagerTopic, false);
+        }
+        
 class GetUserInfoPublishCallback : public MQTTPublishCallback {
 public:
     GetUserInfoPublishCallback(GetUserInfoCallback *cb) : MQTTPublishCallback(), callback(cb) {}
@@ -2359,6 +2403,11 @@ void reloadChannelInfoFromRemote(const std::string &channelId, int64_t updateDt,
             getValue(value, "extra", extra);
 //            int64_t updateDt;
             getValue(value, "updateDt", updateDt);
+            
+            getValue(value, "mute", mute);
+            getValue(value, "joinType", joinType);
+            getValue(value, "privateChat", privateChat);
+            getValue(value, "searchable", searchable);
         }
 
         void TGroupInfo::Serialize(void *pwriter) const {
@@ -2391,6 +2440,23 @@ void reloadChannelInfoFromRemote(const std::string &channelId, int64_t updateDt,
             writer.String("updateDt");
             writer.Int64(updateDt);
 
+            
+//            int mute;
+            writer.String("mute");
+            writer.Int(mute);
+            
+//            int joinType;
+            writer.String("joinType");
+            writer.Int(joinType);
+            
+//            int privateChat;
+            writer.String("privateChat");
+            writer.Int(privateChat);
+            
+//            int searchable;
+            writer.String("searchable");
+            writer.Int(searchable);
+            
             writer.EndObject();
         }
 

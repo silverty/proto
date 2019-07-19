@@ -34,6 +34,7 @@ namespace mars{
         
         extern const char* keyGroup;
         
+        extern const char* keyUserId;
         
         extern const char* keyFromUid;
         extern const char* keyToUid;
@@ -57,6 +58,10 @@ namespace mars{
         extern const char* keyMemberCount;
         extern const char* keyExtra;
         extern const char* keyMemberUpdateDt;
+        extern const char* keyMute;
+        extern const char* keyJoinType;
+        extern const char* keyPrivateChat;
+        extern const char* keySearchable;
         extern const char* keyMemberId;
         extern const char* keyAlias;
         extern const char* keyGroupInfo;
